@@ -1,4 +1,4 @@
-// server.js (Özel geçerlilik süresi özelliği eklendi)
+// server.js (Rate limit ayarları test edilebilir hale getirildi)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -16,6 +16,7 @@ const ADMIN_KEY = process.env.ADMIN_KEY || 'BDaP5924';
 const dbPath = path.join(process.env.RENDER_DISK_MOUNT_PATH || '.', 'keys.db');
 let settings = {};
 
+app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.json());
@@ -38,17 +39,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 function initializeDatabaseAndStartServer() {
     db.serialize(() => {
-        // GÜNCELLEME: access_keys tablosuna validity_days sütunu eklendi
-        db.run(`CREATE TABLE IF NOT EXISTS access_keys (
-            id INTEGER PRIMARY KEY,
-            key TEXT NOT NULL UNIQUE,
-            first_used_at DATETIME DEFAULT NULL,
-            login_count INTEGER DEFAULT 0,
-            last_login_date TEXT,
-            is_blocked INTEGER DEFAULT 0,
-            daily_limit INTEGER NOT NULL DEFAULT 5,
-            validity_days INTEGER NOT NULL DEFAULT 30
-        )`);
+        db.run(`CREATE TABLE IF NOT EXISTS access_keys (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, first_used_at DATETIME DEFAULT NULL, login_count INTEGER DEFAULT 0, last_login_date TEXT, is_blocked INTEGER DEFAULT 0, daily_limit INTEGER NOT NULL DEFAULT 5, validity_days INTEGER NOT NULL DEFAULT 30)`);
         db.run(`CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, setting_value TEXT)`);
         const initialSettings = [['copy_text', 'capcapcut@capcut.onmicrosoft.com'], ['tenant_id', ''], ['client_id', ''], ['client_secret', ''], ['target_user_id', '']];
         const settingStmt = db.prepare("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
@@ -72,7 +63,14 @@ function loadSettings(callback) {
     });
 }
 
-const loginLimiter = rateLimit({ windowMs: 1 * 60 * 1000, max: 20, message: 'Çok fazla giriş denemesi yapıldı. Lütfen 1 dakika sonra tekrar deneyin.', standardHeaders: true, legacyHeaders: false });
+// GÜNCELLEME: Rate limit ayarları düşürüldü
+const loginLimiter = rateLimit({ 
+    windowMs: 1 * 60 * 1000,  // 1 dakika
+    max: 5,                   // Bu süre içinde en fazla 5 deneme
+    message: 'Çok fazla giriş denemesi yapıldı. Lütfen 1 dakika sonra tekrar deneyin.', 
+    standardHeaders: true, 
+    legacyHeaders: false 
+});
 
 app.get('/', (req, res) => { res.render('login', { error: null }); });
 
@@ -88,7 +86,6 @@ app.post('/login', loginLimiter, (req, res) => {
         if (currentLoginCount >= row.daily_limit) { return res.render('login', { error: `Bu anahtar için günlük ${row.daily_limit} giriş hakkınız dolmuştur.` }); }
         if (row.first_used_at) {
             const expiryDate = new Date(row.first_used_at);
-            // GÜNCELLEME: Sabit 30 gün yerine anahtarın kendi geçerlilik süresini kullan
             expiryDate.setDate(expiryDate.getDate() + row.validity_days);
             if (expiryDate < new Date()) { return res.render('login', { error: `Girdiğiniz anahtarın ${row.validity_days} günlük kullanım süresi dolmuş.` }); }
         }
@@ -121,26 +118,17 @@ app.get('/viewer', async (req, res) => {
 });
 
 app.post('/api/generate-key', (req, res) => {
-    if (!req.session.isLoggedIn || !req.session.isAdmin) {
-        return res.status(403).json({ success: false, message: 'Bu işlem için yetkiniz yok.' });
-    }
+    if (!req.session.isLoggedIn || !req.session.isAdmin) { return res.status(403).json({ success: false, message: 'Bu işlem için yetkiniz yok.' }); }
     const newKey = crypto.randomUUID();
     const validityDays = parseInt(req.body.validity_days, 10);
-
     let query = "INSERT INTO access_keys (key) VALUES (?)";
     let params = [newKey];
-
-    // GÜNCELLEME: Eğer geçerli bir gün sayısı girildiyse, sorguyu ve parametreleri güncelle
     if (validityDays && !isNaN(validityDays) && validityDays > 0) {
         query = "INSERT INTO access_keys (key, validity_days) VALUES (?, ?)";
         params.push(validityDays);
     }
-    
     db.run(query, params, function(err) {
-        if (err) {
-            console.error("API anahtar oluşturma hatası:", err.message);
-            return res.status(500).json({ success: false, message: 'Veritabanı hatası nedeniyle anahtar oluşturulamadı.' });
-        }
+        if (err) { console.error("API anahtar oluşturma hatası:", err.message); return res.status(500).json({ success: false, message: 'Veritabanı hatası nedeniyle anahtar oluşturulamadı.' }); }
         res.json({ success: true, newKey: newKey });
     });
 });
@@ -196,7 +184,10 @@ app.post('/update-azure-settings', (req, res) => {
     if (!req.session.isAdmin) { return res.status(403).send("Yetkiniz yok."); }
     const { tenant_id, client_id, client_secret, target_user_id } = req.body;
     const stmt = db.prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
-    stmt.run(tenant_id, 'tenant_id'); stmt.run(client_id, 'client_id'); stmt.run(client_secret, 'client_secret'); stmt.run(target_user_id, 'target_user_id');
+    stmt.run(tenant_id, 'tenant_id');
+    stmt.run(client_id, 'client_id');
+    stmt.run(client_secret, 'client_secret');
+    stmt.run(target_user_id, 'target_user_id');
     stmt.finalize((err) => {
         if (err) { return res.status(500).send("Azure ayarları kaydedilemedi."); }
         loadSettings(() => {
@@ -209,5 +200,43 @@ app.post('/update-azure-settings', (req, res) => {
 app.get('/logout', (req, res) => { req.session.destroy(() => res.redirect('/')); });
 
 let msGraphToken = { accessToken: null, expiresAt: 0 };
-async function getMsGraphToken() { if (msGraphToken.accessToken && Date.now() < msGraphToken.expiresAt) { return msGraphToken.accessToken; } if (!settings.tenant_id || !settings.client_id || !settings.client_secret) { console.log("Azure ayarları eksik, token alınamıyor."); return null; } const tokenUrl = `https://login.microsoftonline.com/${settings.tenant_id}/oauth2/v2.0/token`; const params = new URLSearchParams(); params.append('grant_type', 'client_credentials'); params.append('client_id', settings.client_id); params.append('client_secret', settings.client_secret); params.append('scope', 'https://graph.microsoft.com/.default'); try { const response = await axios.post(tokenUrl, params); msGraphToken.accessToken = response.data.access_token; msGraphToken.expiresAt = Date.now() + (response.data.expires_in - 300) * 1000; console.log("Yeni bir Microsoft Graph API token'ı alındı."); return msGraphToken.accessToken; } catch (error) { console.error("HATA: Microsoft'tan token alınamadı.", error.response?.data); return null; } }
-async function getLatestEmail() { const accessToken = await getMsGraphToken(); if (!accessToken) return { error: 'API token alınamadı. Lütfen admin panelinden Azure ayarlarını kontrol edin.' }; if (!settings.target_user_id) return { error: 'Hedef mail adresi admin panelinde ayarlanmamış.' }; const graphUrl = `https://graph.microsoft.com/v1.0/users/${settings.target_user_id}/messages?$filter=from/emailAddress/address eq 'no-reply@account.capcut.com'&$top=20&$select=subject,from,receivedDateTime,body`; try { const response = await axios.get(graphUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } }); const messages = response.data.value; if (messages && messages.length > 0) { messages.sort((a, b) => new Date(b.receivedDateTime) - new Date(a.receivedDateTime)); return messages[0]; } else { return null; } } catch (error) { const errorMessage = error.response?.data?.error?.message || error.message; return { error: `Mail çekilemedi: ${errorMessage}` }; } }
+async function getMsGraphToken() {
+    if (msGraphToken.accessToken && Date.now() < msGraphToken.expiresAt) { return msGraphToken.accessToken; }
+    if (!settings.tenant_id || !settings.client_id || !settings.client_secret) { console.log("Azure ayarları eksik, token alınamıyor."); return null; }
+    const tokenUrl = `https://login.microsoftonline.com/${settings.tenant_id}/oauth2/v2.0/token`;
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials');
+    params.append('client_id', settings.client_id);
+    params.append('client_secret', settings.client_secret);
+    params.append('scope', 'https://graph.microsoft.com/.default');
+    try {
+        const response = await axios.post(tokenUrl, params);
+        msGraphToken.accessToken = response.data.access_token;
+        msGraphToken.expiresAt = Date.now() + (response.data.expires_in - 300) * 1000;
+        console.log("Yeni bir Microsoft Graph API token'ı alındı.");
+        return msGraphToken.accessToken;
+    } catch (error) {
+        console.error("HATA: Microsoft'tan token alınamadı.", error.response?.data);
+        return null;
+    }
+}
+
+async function getLatestEmail() {
+    const accessToken = await getMsGraphToken();
+    if (!accessToken) return { error: 'API token alınamadı. Lütfen admin panelinden Azure ayarlarını kontrol edin.' };
+    if (!settings.target_user_id) return { error: 'Hedef mail adresi admin panelinde ayarlanmamış.' };
+    const graphUrl = `https://graph.microsoft.com/v1.0/users/${settings.target_user_id}/messages?$filter=from/emailAddress/address eq 'no-reply@account.capcut.com'&$top=20&$select=subject,from,receivedDateTime,body`;
+    try {
+        const response = await axios.get(graphUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+        const messages = response.data.value;
+        if (messages && messages.length > 0) {
+            messages.sort((a, b) => new Date(b.receivedDateTime) - new Date(a.receivedDateTime));
+            return messages[0];
+        } else {
+            return null;
+        }
+    } catch (error) {
+        const errorMessage = error.response?.data?.error?.message || error.message;
+        return { error: `Mail çekilemedi: ${errorMessage}` };
+    }
+}
