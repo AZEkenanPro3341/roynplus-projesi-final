@@ -199,6 +199,7 @@ footer {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap; /* GÜNCELLEME: Küçük ekranlar için kaydırma */
 }
 .key-gen-form input {
     flex-grow: 1;
@@ -356,56 +357,55 @@ footer {
         gap: 10px;
         align-items: stretch;
     }
-
+    
+    /* DÜZELTME: Mobil tablo görünümü */
     .key-management-table thead {
-        display: none;
-    }
-
-    .key-management-table,
-    .key-management-table tbody,
-    .key-management-table tr,
-    .key-management-table td {
-        display: block;
-        width: 100%;
+        border: none;
+        clip: rect(0 0 0 0);
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        padding: 0;
+        position: absolute;
+        width: 1px;
     }
 
     .key-management-table tr {
-        margin-bottom: 15px;
         border: 1px solid #ddd;
         border-radius: 5px;
-        overflow: hidden;
+        display: block;
+        margin-bottom: 20px;
+        padding: 10px;
     }
 
     .key-management-table td {
+        border-bottom: 1px solid #ddd;
+        display: flex; /* İçeriği yan yana getirir */
+        justify-content: space-between; /* Aralarına boşluk bırakır */
+        align-items: center; /* Dikey olarak ortalar */
+        font-size: 0.9em;
         text-align: right;
-        padding-left: 50%;
-        position: relative;
-        border: none;
-        border-bottom: 1px solid #eee;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        min-height: 38px;
+        padding: 10px 5px;
     }
 
-    .key-management-table td:before {
+    .key-management-table td::before {
         content: attr(data-label);
-        position: absolute;
-        left: 10px;
-        width: 45%;
-        padding-right: 10px;
-        white-space: nowrap;
-        text-align: left;
         font-weight: bold;
+        text-align: left;
+        margin-right: 15px;
+    }
+
+    .key-management-table td:last-child {
+        border-bottom: 0;
     }
 
     .actions-cell {
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 10px;
-    }
-
-    .actions-cell form {
+        flex-direction: row; /* Mobil için yatay */
+        flex-wrap: wrap; /* Gerekirse alta kaydır */
         justify-content: flex-end;
+    }
+    
+    .actions-cell form {
+       margin: 2px;
     }
 }

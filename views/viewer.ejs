@@ -171,15 +171,34 @@
             }, duration);
         }
 
+        // GÜNCELLEME: Panoya kopyalama için daha sağlam bir fonksiyon
+        function robustCopyToClipboard(text) {
+            // Modern, güvenli yöntem
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            } else {
+                // Eski yöntem (fallback)
+                let textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed"; // Sayfanın kaymasını engelle
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                return new Promise((res, rej) => {
+                    document.execCommand('copy') ? res() : rej(new Error('Kopyalama komutu başarısız oldu'));
+                    textArea.remove();
+                });
+            }
+        }
+
         const createBtn = document.getElementById('create-and-copy-btn');
         if (createBtn) {
             createBtn.addEventListener('click', async () => {
                 createBtn.textContent = 'Oluşturuluyor...';
                 createBtn.disabled = true;
-
                 const validityInput = document.getElementById('validity-days-input');
                 const validity = validityInput.value;
-
                 try {
                     const response = await fetch('/api/generate-key', {
                         method: 'POST',
@@ -187,9 +206,8 @@
                         body: JSON.stringify({ validity_days: validity })
                     });
                     const data = await response.json();
-
                     if (response.ok && data.success) {
-                        await navigator.clipboard.writeText(data.newKey);
+                        await robustCopyToClipboard(data.newKey);
                         showAlert(`Oluşturuldu ve kopyalandı: ${data.newKey}`);
                         validityInput.value = '';
                     } else {
@@ -206,7 +224,7 @@
         }
         
         function copyKey(keyText) {
-            navigator.clipboard.writeText(keyText).then(() => {
+            robustCopyToClipboard(keyText).then(() => {
                 showAlert('Anahtar panoya kopyalandı!', 'success', 2000);
             }).catch(err => {
                 console.error('Anahtar kopyalanamadı:', err);
