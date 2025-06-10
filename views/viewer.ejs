@@ -24,7 +24,7 @@
                 <h2>Yönetici Paneli</h2>
                 <div class="sub-card">
                     <h4>Yeni Anahtar Oluştur</h4>
-                     <div class="key-gen-form">
+                    <div class="key-gen-form">
                         <input type="number" id="validity-days-input" placeholder="Süre (gün) (Varsayılan: 30)" min="1" class="key-gen-input">
                         <button type="button" id="create-and-copy-btn">Oluştur ve Kopyala</button>
                     </div>
@@ -138,7 +138,7 @@
         <div class="card">
             <h2>Gelen Son Mail (Referans)</h2>
             <% if (locals.email && !locals.email.error) { %>
-                <p><strong>Geliş Tarihi:</strong> <%= new Date(email.receivedDateTime).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) %></p>
+                <p><strong>Geliş Tarihi:</strong> <%= new Date(email.receivedDateTime).toLocaleString('tr-TR', { timeZone: 'Asia/Baku' }) %></p>
                 <p><strong>Konu:</strong> <%= email.subject %></p>
                 <p><strong>Gönderen:</strong> <%= email.from.emailAddress.name %> (<%= email.from.emailAddress.address %>)</p>
                 <hr>
@@ -172,7 +172,6 @@
                 createBtn.textContent = 'Oluşturuluyor...';
                 createBtn.disabled = true;
 
-                // GÜNCELLEME: Geçerlilik süresini input'tan al
                 const validityInput = document.getElementById('validity-days-input');
                 const validity = validityInput.value;
 
@@ -180,14 +179,14 @@
                     const response = await fetch('/api/generate-key', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ validity_days: validity }) // API'ye gönder
+                        body: JSON.stringify({ validity_days: validity })
                     });
                     const data = await response.json();
 
                     if (response.ok && data.success) {
                         await navigator.clipboard.writeText(data.newKey);
                         showAlert(`Oluşturuldu ve kopyalandı: ${data.newKey}`);
-                        validityInput.value = ''; // Input'u temizle
+                        validityInput.value = '';
                     } else {
                         showAlert(data.message || 'Bir hata oluştu.', 'danger');
                     }
