@@ -1,4 +1,3 @@
-// server.js (NORMAL ÇALIŞAN FİNAL SÜRÜM - SÜRE 30 GÜN)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -36,7 +35,10 @@ async function getLatestEmail() { const accessToken = await getMsGraphToken(); i
 // --- Express Ayarları ---
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
+
+// YENİ EKLENEN SATIR: 'public' klasörünü dışarıya açar
 app.use(express.static(path.join(__dirname, 'public')));
+
 app.use(session({
     store: new SQLiteStore({
         db: 'sessions.db',
@@ -70,15 +72,10 @@ app.post('/login', (req, res) => {
                     req.session.isLoggedIn = true; res.redirect('/viewer');
                 });
             } else {
-                const firstUsedDate = new Date(row.first_used_at); 
-                const expiryDate = new Date(firstUsedDate);
-                // -------> TEKRAR NORMAL HALİNE DÖNDÜ <-------
-                expiryDate.setDate(firstUsedDate.getDate() + 30); 
-                if (expiryDate > new Date()) { 
-                    req.session.isLoggedIn = true; res.redirect('/viewer'); 
-                } else { 
-                    res.render('login', { error: 'Girdiğiniz anahtarın 1 aylık kullanım süresi dolmuş.' }); 
-                }
+                const firstUsedDate = new Date(row.first_used_at); const expiryDate = new Date(firstUsedDate);
+                expiryDate.setDate(firstUsedDate.getDate() + 30);
+                if (expiryDate > new Date()) { req.session.isLoggedIn = true; res.redirect('/viewer'); }
+                else { res.render('login', { error: 'Girdiğiniz anahtarın 1 aylık kullanım süresi dolmuş.' }); }
             }
         } else { res.render('login', { error: 'Geçersiz anahtar.' }); }
     });
