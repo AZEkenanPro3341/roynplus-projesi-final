@@ -1,4 +1,4 @@
-// server.js (Rate limit ayarları test edilebilir hale getirildi)
+// server.js (Varsayılan kopyalama metni güncellendi)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -41,7 +41,15 @@ function initializeDatabaseAndStartServer() {
     db.serialize(() => {
         db.run(`CREATE TABLE IF NOT EXISTS access_keys (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, first_used_at DATETIME DEFAULT NULL, login_count INTEGER DEFAULT 0, last_login_date TEXT, is_blocked INTEGER DEFAULT 0, daily_limit INTEGER NOT NULL DEFAULT 5, validity_days INTEGER NOT NULL DEFAULT 30)`);
         db.run(`CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, setting_value TEXT)`);
-        const initialSettings = [['copy_text', 'capcapcut@capcut.onmicrosoft.com'], ['tenant_id', ''], ['client_id', ''], ['client_secret', ''], ['target_user_id', '']];
+        
+        // GÜNCELLEME: Varsayılan metin değiştirildi
+        const initialSettings = [
+            ['copy_text', 'capcapcut@capcut.onmicrosoft.com'], 
+            ['tenant_id', ''], 
+            ['client_id', ''], 
+            ['client_secret', ''], 
+            ['target_user_id', '']
+        ];
         const settingStmt = db.prepare("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
         initialSettings.forEach(s => settingStmt.run(s[0], s[1]));
         settingStmt.finalize((err) => {
@@ -63,10 +71,9 @@ function loadSettings(callback) {
     });
 }
 
-// GÜNCELLEME: Rate limit ayarları düşürüldü
 const loginLimiter = rateLimit({ 
-    windowMs: 1 * 60 * 1000,  // 1 dakika
-    max: 5,                   // Bu süre içinde en fazla 5 deneme
+    windowMs: 1 * 60 * 1000,
+    max: 5,
     message: 'Çok fazla giriş denemesi yapıldı. Lütfen 1 dakika sonra tekrar deneyin.', 
     standardHeaders: true, 
     legacyHeaders: false 
