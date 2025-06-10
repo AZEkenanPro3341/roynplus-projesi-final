@@ -23,7 +23,11 @@
             <div class="card">
                 <h2>Yönetici Paneli</h2>
                 <div class="sub-card">
-                    <button type="button" id="create-and-copy-btn">Yeni Anahtar Oluştur ve Kopyala</button>
+                    <h4>Yeni Anahtar Oluştur</h4>
+                     <div class="key-gen-form">
+                        <input type="number" id="validity-days-input" placeholder="Süre (gün) (Varsayılan: 30)" min="1" class="key-gen-input">
+                        <button type="button" id="create-and-copy-btn">Oluştur ve Kopyala</button>
+                    </div>
                 </div>
                 <div class="sub-card">
                     <h4>Azure Ayarları</h4>
@@ -66,7 +70,7 @@
                                 <tr>
                                     <th>Anahtar</th>
                                     <th>Durum</th>
-                                    <th>İlk Kullanım</th>
+                                    <th>Geçerlilik</th>
                                     <th>Bitiş Tarihi</th>
                                     <th>Günlük Limit</th>
                                     <th>Günlük Kullanım</th>
@@ -77,10 +81,11 @@
                                 <% locals.keys.forEach(k => { %>
                                     <%
                                         let status = { text: 'Aktif', class: 'status-active' };
-                                        let expiryDate = new Date();
+                                        let expiryDateStr = 'N/A';
                                         if (k.first_used_at) {
-                                            expiryDate = new Date(k.first_used_at);
-                                            expiryDate.setDate(expiryDate.getDate() + 30);
+                                            const expiryDate = new Date(k.first_used_at);
+                                            expiryDate.setDate(expiryDate.getDate() + k.validity_days);
+                                            expiryDateStr = expiryDate.toLocaleDateString('tr-TR');
                                             if (expiryDate < new Date()) { status = { text: 'Süresi Dolmuş', class: 'status-expired' }; }
                                         }
                                         if (k.is_blocked) { status = { text: 'Engelli', class: 'status-blocked' }; }
@@ -90,8 +95,8 @@
                                     <tr>
                                         <td data-label="Anahtar" title="<%= k.key %>"><%= k.key.substring(0, 13) %>...</td>
                                         <td data-label="Durum"><span class="status <%= status.class %>"><%= status.text %></span></td>
-                                        <td data-label="İlk Kullanım"><%= k.first_used_at ? new Date(k.first_used_at).toLocaleDateString('tr-TR') : 'Kullanılmadı' %></td>
-                                        <td data-label="Bitiş Tarihi"><%= k.first_used_at ? expiryDate.toLocaleDateString('tr-TR') : 'N/A' %></td>
+                                        <td data-label="Geçerlilik"><%= k.validity_days %> gün</td>
+                                        <td data-label="Bitiş Tarihi"><%= expiryDateStr %></td>
                                         <td data-label="Günlük Limit" class="actions-cell">
                                             <form action="/update-limit/<%= k.key %>" method="post" class="limit-form">
                                                 <input type="hidden" name="searchTerm" value="<%= locals.searchTerm || '' %>">
@@ -148,7 +153,7 @@
     
     <% if (locals.isAdmin) { %>
     <script>
-        function showAlert(message, type = 'success', duration = 4000) {
+        function showAlert(message, type = 'success', duration = 5000) {
             const alertContainer = document.getElementById('alert-container');
             const alertDiv = document.createElement('div');
             alertDiv.className = `card alert alert-${type}`;
@@ -167,13 +172,22 @@
                 createBtn.textContent = 'Oluşturuluyor...';
                 createBtn.disabled = true;
 
+                // GÜNCELLEME: Geçerlilik süresini input'tan al
+                const validityInput = document.getElementById('validity-days-input');
+                const validity = validityInput.value;
+
                 try {
-                    const response = await fetch('/api/generate-key', { method: 'POST' });
+                    const response = await fetch('/api/generate-key', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ validity_days: validity }) // API'ye gönder
+                    });
                     const data = await response.json();
 
                     if (response.ok && data.success) {
                         await navigator.clipboard.writeText(data.newKey);
                         showAlert(`Oluşturuldu ve kopyalandı: ${data.newKey}`);
+                        validityInput.value = ''; // Input'u temizle
                     } else {
                         showAlert(data.message || 'Bir hata oluştu.', 'danger');
                     }
@@ -181,7 +195,7 @@
                     console.error('API isteği başarısız:', error);
                     showAlert('İstek gönderilirken bir hata oluştu.', 'danger');
                 } finally {
-                    createBtn.textContent = 'Yeni Anahtar Oluştur ve Kopyala';
+                    createBtn.textContent = 'Oluştur ve Kopyala';
                     createBtn.disabled = false;
                 }
             });

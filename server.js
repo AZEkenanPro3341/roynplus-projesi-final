@@ -1,4 +1,4 @@
-// server.js ("Oluştur ve Kopyala" için API rotası eklendi)
+// server.js (Özel geçerlilik süresi özelliği eklendi)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -18,7 +18,7 @@ let settings = {};
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.use(express.json()); // YENİ: API'den JSON kabul etmek için
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
@@ -38,7 +38,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 function initializeDatabaseAndStartServer() {
     db.serialize(() => {
-        db.run(`CREATE TABLE IF NOT EXISTS access_keys (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, first_used_at DATETIME DEFAULT NULL, login_count INTEGER DEFAULT 0, last_login_date TEXT, is_blocked INTEGER DEFAULT 0, daily_limit INTEGER NOT NULL DEFAULT 5)`);
+        // GÜNCELLEME: access_keys tablosuna validity_days sütunu eklendi
+        db.run(`CREATE TABLE IF NOT EXISTS access_keys (
+            id INTEGER PRIMARY KEY,
+            key TEXT NOT NULL UNIQUE,
+            first_used_at DATETIME DEFAULT NULL,
+            login_count INTEGER DEFAULT 0,
+            last_login_date TEXT,
+            is_blocked INTEGER DEFAULT 0,
+            daily_limit INTEGER NOT NULL DEFAULT 5,
+            validity_days INTEGER NOT NULL DEFAULT 30
+        )`);
         db.run(`CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, setting_value TEXT)`);
         const initialSettings = [['copy_text', 'Lütfen kopyalanacak metni admin panelinden ayarlayın.'], ['tenant_id', ''], ['client_id', ''], ['client_secret', ''], ['target_user_id', '']];
         const settingStmt = db.prepare("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
@@ -78,8 +88,9 @@ app.post('/login', loginLimiter, (req, res) => {
         if (currentLoginCount >= row.daily_limit) { return res.render('login', { error: `Bu anahtar için günlük ${row.daily_limit} giriş hakkınız dolmuştur.` }); }
         if (row.first_used_at) {
             const expiryDate = new Date(row.first_used_at);
-            expiryDate.setDate(expiryDate.getDate() + 30);
-            if (expiryDate < new Date()) { return res.render('login', { error: 'Girdiğiniz anahtarın 30 günlük kullanım süresi dolmuş.' }); }
+            // GÜNCELLEME: Sabit 30 gün yerine anahtarın kendi geçerlilik süresini kullan
+            expiryDate.setDate(expiryDate.getDate() + row.validity_days);
+            if (expiryDate < new Date()) { return res.render('login', { error: `Girdiğiniz anahtarın ${row.validity_days} günlük kullanım süresi dolmuş.` }); }
         }
         const now = row.first_used_at || new Date().toISOString();
         db.run("UPDATE access_keys SET first_used_at = ?, login_count = ?, last_login_date = ? WHERE key = ?", [now, currentLoginCount + 1, today, userKey], (updateErr) => {
@@ -109,13 +120,23 @@ app.get('/viewer', async (req, res) => {
     }
 });
 
-// YENİ: Anahtar oluşturup JSON döndüren API rotası
 app.post('/api/generate-key', (req, res) => {
     if (!req.session.isLoggedIn || !req.session.isAdmin) {
         return res.status(403).json({ success: false, message: 'Bu işlem için yetkiniz yok.' });
     }
     const newKey = crypto.randomUUID();
-    db.run("INSERT INTO access_keys (key) VALUES (?)", [newKey], function(err) {
+    const validityDays = parseInt(req.body.validity_days, 10);
+
+    let query = "INSERT INTO access_keys (key) VALUES (?)";
+    let params = [newKey];
+
+    // GÜNCELLEME: Eğer geçerli bir gün sayısı girildiyse, sorguyu ve parametreleri güncelle
+    if (validityDays && !isNaN(validityDays) && validityDays > 0) {
+        query = "INSERT INTO access_keys (key, validity_days) VALUES (?, ?)";
+        params.push(validityDays);
+    }
+    
+    db.run(query, params, function(err) {
         if (err) {
             console.error("API anahtar oluşturma hatası:", err.message);
             return res.status(500).json({ success: false, message: 'Veritabanı hatası nedeniyle anahtar oluşturulamadı.' });
