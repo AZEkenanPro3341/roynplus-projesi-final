@@ -26,7 +26,11 @@
                     <h4>Yeni Anahtar Oluştur</h4>
                     <div class="key-gen-form">
                         <input type="number" id="validity-days-input" placeholder="Süre (gün) (Varsayılan: 30)" min="1" class="key-gen-input">
-                        <button type="button" id="create-and-copy-btn">Oluştur ve Kopyala</button>
+                        <button type="button" id="create-and-copy-btn">Oluştur</button>
+                    </div>
+                    <div id="new-key-result" class="key-gen-form" style="display: none; margin-top: 15px;">
+                        <input type="text" id="new-key-display" readonly>
+                        <button type="button" id="new-key-copy-btn" class="btn-small">Kopyala</button>
                     </div>
                 </div>
                 <div class="sub-card">
@@ -158,7 +162,7 @@
     
     <% if (locals.isAdmin) { %>
     <script>
-        function showAlert(message, type = 'success', duration = 5000) {
+        function showAlert(message, type = 'success', duration = 4000) {
             const alertContainer = document.getElementById('alert-container');
             const alertDiv = document.createElement('div');
             alertDiv.className = `card alert alert-${type}`;
@@ -170,17 +174,14 @@
                 setTimeout(() => { if (alertContainer.contains(alertDiv)) { alertContainer.removeChild(alertDiv); } }, 500);
             }, duration);
         }
-
-        // GÜNCELLEME: Panoya kopyalama için daha sağlam bir fonksiyon
+        
         function robustCopyToClipboard(text) {
-            // Modern, güvenli yöntem
             if (navigator.clipboard && window.isSecureContext) {
                 return navigator.clipboard.writeText(text);
             } else {
-                // Eski yöntem (fallback)
                 let textArea = document.createElement("textarea");
                 textArea.value = text;
-                textArea.style.position = "fixed"; // Sayfanın kaymasını engelle
+                textArea.style.position = "fixed";
                 textArea.style.left = "-9999px";
                 document.body.appendChild(textArea);
                 textArea.focus();
@@ -194,6 +195,10 @@
 
         const createBtn = document.getElementById('create-and-copy-btn');
         if (createBtn) {
+            const newKeyResultDiv = document.getElementById('new-key-result');
+            const newKeyDisplayInput = document.getElementById('new-key-display');
+            const newKeyCopyBtn = document.getElementById('new-key-copy-btn');
+
             createBtn.addEventListener('click', async () => {
                 createBtn.textContent = 'Oluşturuluyor...';
                 createBtn.disabled = true;
@@ -207,8 +212,9 @@
                     });
                     const data = await response.json();
                     if (response.ok && data.success) {
-                        await robustCopyToClipboard(data.newKey);
-                        showAlert(`Oluşturuldu ve kopyalandı: ${data.newKey}`);
+                        newKeyDisplayInput.value = data.newKey;
+                        newKeyResultDiv.style.display = 'flex';
+                        showAlert('Yeni anahtar oluşturuldu. Aşağıdan kopyalayabilirsiniz.');
                         validityInput.value = '';
                     } else {
                         showAlert(data.message || 'Bir hata oluştu.', 'danger');
@@ -217,9 +223,17 @@
                     console.error('API isteği başarısız:', error);
                     showAlert('İstek gönderilirken bir hata oluştu.', 'danger');
                 } finally {
-                    createBtn.textContent = 'Oluştur ve Kopyala';
+                    createBtn.textContent = 'Oluştur';
                     createBtn.disabled = false;
                 }
+            });
+            
+            newKeyCopyBtn.addEventListener('click', () => {
+                robustCopyToClipboard(newKeyDisplayInput.value).then(() => {
+                    showAlert('Anahtar panoya kopyalandı!', 'success', 2000);
+                }).catch(err => {
+                    showAlert('Hata: Kopyalanamadı!', 'danger', 3000);
+                });
             });
         }
         
@@ -237,7 +251,7 @@
     <script>
         function copyToClipboard() {
             const content = document.getElementById('copy-content');
-            navigator.clipboard.writeText(content.value)
+            robustCopyToClipboard(content.value) // Normal kullanıcılar için de sağlam kopyalayıcıyı kullan
                 .then(() => {
                     const feedback = document.getElementById('copy-feedback');
                     feedback.textContent = 'Metin başarıyla kopyalandı!';

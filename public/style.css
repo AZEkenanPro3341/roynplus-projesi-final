@@ -58,6 +58,11 @@ input[type="number"] {
     font-family: inherit;
 }
 
+input[readonly] {
+    background-color: #e9ecef;
+    cursor: default;
+}
+
 textarea {
     min-height: 120px;
     resize: vertical;
@@ -199,7 +204,7 @@ footer {
     display: flex;
     gap: 10px;
     align-items: center;
-    flex-wrap: wrap; /* GÜNCELLEME: Küçük ekranlar için kaydırma */
+    flex-wrap: wrap; 
 }
 .key-gen-form input {
     flex-grow: 1;
@@ -357,8 +362,17 @@ footer {
         gap: 10px;
         align-items: stretch;
     }
+
+    .key-gen-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .key-gen-form input,
+    .key-gen-form button {
+        width: auto;
+    }
     
-    /* DÜZELTME: Mobil tablo görünümü */
     .key-management-table thead {
         border: none;
         clip: rect(0 0 0 0);
@@ -379,10 +393,10 @@ footer {
     }
 
     .key-management-table td {
-        border-bottom: 1px solid #ddd;
-        display: flex; /* İçeriği yan yana getirir */
-        justify-content: space-between; /* Aralarına boşluk bırakır */
-        align-items: center; /* Dikey olarak ortalar */
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         font-size: 0.9em;
         text-align: right;
         padding: 10px 5px;
@@ -400,12 +414,13 @@ footer {
     }
 
     .actions-cell {
-        flex-direction: row; /* Mobil için yatay */
-        flex-wrap: wrap; /* Gerekirse alta kaydır */
-        justify-content: flex-end;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 10px;
     }
     
     .actions-cell form {
-       margin: 2px;
+       justify-content: flex-end;
+       width: 100%;
     }
 }
