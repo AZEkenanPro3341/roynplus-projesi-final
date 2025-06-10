@@ -11,84 +11,114 @@
         <a href="/logout" class="logout-link">Çıkış Yap</a>
         <hr>
 
+        <div id="alert-container">
+            <% if (locals.successMessage) { %>
+                <div class="card alert alert-success" role="alert">
+                    <%= locals.successMessage %>
+                </div>
+            <% } %>
+        </div>
+
         <% if (locals.isAdmin) { %>
             <div class="card">
                 <h2>Yönetici Paneli</h2>
-                <form action="/update-azure-settings" method="post">
+                <div class="sub-card">
+                    <button type="button" id="create-and-copy-btn">Yeni Anahtar Oluştur ve Kopyala</button>
+                </div>
+                <div class="sub-card">
                     <h4>Azure Ayarları</h4>
-                    <label for="tenant_id">Tenant ID</label>
-                    <input type="text" id="tenant_id" name="tenant_id" value="<%= locals.settings.tenant_id %>">
-                    <label for="client_id">Client ID</label>
-                    <input type="text" id="client_id" name="client_id" value="<%= locals.settings.client_id %>">
-                    <label for="client_secret">Client Secret</label>
-                    <input type="password" id="client_secret" name="client_secret" value="<%= locals.settings.client_secret %>">
-                    <label for="target_user_id">Target User ID (Mail Adresi)</label>
-                    <input type="text" id="target_user_id" name="target_user_id" value="<%= locals.settings.target_user_id %>">
-                    <button type="submit">Azure Ayarlarını Kaydet</button>
-                </form>
-                <hr>
-                <form action="/update-copy-text" method="post">
+                    <form action="/update-azure-settings" method="post">
+                        <label for="tenant_id">Tenant ID</label>
+                        <input type="text" id="tenant_id" name="tenant_id" value="<%= locals.settings.tenant_id %>">
+                        <label for="client_id">Client ID</label>
+                        <input type="text" id="client_id" name="client_id" value="<%= locals.settings.client_id %>">
+                        <label for="client_secret">Client Secret</label>
+                        <input type="password" id="client_secret" name="client_secret" value="<%= locals.settings.client_secret %>">
+                        <label for="target_user_id">Target User ID (Mail Adresi)</label>
+                        <input type="text" id="target_user_id" name="target_user_id" value="<%= locals.settings.target_user_id %>">
+                        <button type="submit">Azure Ayarlarını Kaydet</button>
+                    </form>
+                </div>
+                <div class="sub-card">
                     <h4>Kopyalanacak Metni Düzenle</h4>
-                    <textarea name="new_text" rows="8"><%= locals.settings.copy_text %></textarea>
-                    <br>
-                    <button type="submit">Kopyalanacak Metni Kaydet</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h2>Anahtar Yönetimi</h2>
-                <div class="table-container">
-                    <table class="key-management-table">
-                        <thead>
-                            <tr>
-                                <th>Anahtar</th>
-                                <th>Durum</th>
-                                <th>İlk Kullanım</th>
-                                <th>Bitiş Tarihi</th>
-                                <th>Günlük Kullanım</th>
-                                <th>İşlemler</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% locals.keys.forEach(k => { %>
-                                <%
-                                    let status = { text: 'Aktif', class: 'status-active' };
-                                    let expiryDate = new Date();
-                                    let isExpired = false;
-                                    if (k.first_used_at) {
-                                        expiryDate = new Date(k.first_used_at);
-                                        expiryDate.setDate(expiryDate.getDate() + 30);
-                                        if (expiryDate < new Date()) {
-                                            isExpired = true;
-                                            status = { text: 'Süresi Dolmuş', class: 'status-expired' };
-                                        }
-                                    }
-                                    if (k.is_blocked) {
-                                        status = { text: 'Engelli', class: 'status-blocked' };
-                                    }
-                                    const today = new Date().toISOString().split('T')[0];
-                                    const dailyUsage = (k.last_login_date === today) ? k.login_count : 0;
-                                %>
-                                <tr>
-                                    <td data-label="Anahtar"><%= k.key.substring(0, 13) %>...</td>
-                                    <td data-label="Durum"><span class="status <%= status.class %>"><%= status.text %></span></td>
-                                    <td data-label="İlk Kullanım"><%= k.first_used_at ? new Date(k.first_used_at).toLocaleDateString('tr-TR') : 'Kullanılmadı' %></td>
-                                    <td data-label="Bitiş Tarihi"><%= k.first_used_at ? expiryDate.toLocaleDateString('tr-TR') : 'N/A' %></td>
-                                    <td data-label="Günlük Kullanım"><%= dailyUsage %> / 5</td>
-                                    <td data-label="İşlemler">
-                                        <form action="/toggle-block/<%= k.key %>" method="post" style="margin: 0;">
-                                            <button type="submit" class="btn-small <%= k.is_blocked ? 'btn-unblock' : 'btn-block' %>">
-                                                <%= k.is_blocked ? 'Engeli Kaldır' : 'Engelle' %>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <% }); %>
-                        </tbody>
-                    </table>
+                    <form action="/update-copy-text" method="post">
+                        <textarea name="new_text" rows="8"><%= locals.settings.copy_text %></textarea>
+                        <br>
+                        <button type="submit">Kopyalanacak Metni Kaydet</button>
+                    </form>
                 </div>
             </div>
 
+            <div class="card">
+                <h2>Kullanılan Anahtarların Yönetimi</h2>
+                <div class="sub-card">
+                    <form action="/viewer" method="get" class="search-form">
+                        <input type="text" name="search" placeholder="Anahtar içinde ara..." value="<%= locals.searchTerm || '' %>">
+                        <button type="submit" class="btn-search">Ara</button>
+                        <a href="/viewer" class="btn-clear">Temizle</a>
+                    </form>
+                </div>
+
+                <% if (locals.keys && locals.keys.length > 0) { %>
+                    <div class="table-container">
+                        <table class="key-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Anahtar</th>
+                                    <th>Durum</th>
+                                    <th>İlk Kullanım</th>
+                                    <th>Bitiş Tarihi</th>
+                                    <th>Günlük Limit</th>
+                                    <th>Günlük Kullanım</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% locals.keys.forEach(k => { %>
+                                    <%
+                                        let status = { text: 'Aktif', class: 'status-active' };
+                                        let expiryDate = new Date();
+                                        if (k.first_used_at) {
+                                            expiryDate = new Date(k.first_used_at);
+                                            expiryDate.setDate(expiryDate.getDate() + 30);
+                                            if (expiryDate < new Date()) { status = { text: 'Süresi Dolmuş', class: 'status-expired' }; }
+                                        }
+                                        if (k.is_blocked) { status = { text: 'Engelli', class: 'status-blocked' }; }
+                                        const today = new Date().toISOString().split('T')[0];
+                                        const dailyUsage = (k.last_login_date === today) ? k.login_count : 0;
+                                    %>
+                                    <tr>
+                                        <td data-label="Anahtar" title="<%= k.key %>"><%= k.key.substring(0, 13) %>...</td>
+                                        <td data-label="Durum"><span class="status <%= status.class %>"><%= status.text %></span></td>
+                                        <td data-label="İlk Kullanım"><%= k.first_used_at ? new Date(k.first_used_at).toLocaleDateString('tr-TR') : 'Kullanılmadı' %></td>
+                                        <td data-label="Bitiş Tarihi"><%= k.first_used_at ? expiryDate.toLocaleDateString('tr-TR') : 'N/A' %></td>
+                                        <td data-label="Günlük Limit" class="actions-cell">
+                                            <form action="/update-limit/<%= k.key %>" method="post" class="limit-form">
+                                                <input type="hidden" name="searchTerm" value="<%= locals.searchTerm || '' %>">
+                                                <input type="number" name="new_limit" value="<%= k.daily_limit %>" class="input-small" min="0">
+                                                <button type="submit" class="btn-small btn-save">✓</button>
+                                            </form>
+                                        </td>
+                                        <td data-label="Günlük Kullanım"><%= dailyUsage %> / <%= k.daily_limit %></td>
+                                        <td data-label="İşlemler" class="actions-cell">
+                                            <form action="/toggle-block/<%= k.key %>" method="post">
+                                                 <input type="hidden" name="searchTerm" value="<%= locals.searchTerm || '' %>">
+                                                <button type="submit" class="btn-small <%= k.is_blocked ? 'btn-unblock' : 'btn-block' %>"><%= k.is_blocked ? 'Engeli Kaldır' : 'Engelle' %></button>
+                                            </form>
+                                            <form action="/delete-key/<%= k.key %>" method="post">
+                                                 <input type="hidden" name="searchTerm" value="<%= locals.searchTerm || '' %>">
+                                                <button type="submit" class="btn-small btn-delete" onclick="return confirm('Bu anahtarı kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!');">Sil</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } else { %>
+                    <p><%= locals.searchTerm ? 'Arama kriterlerinize uygun anahtar bulunamadı.' : 'Henüz hiç anahtar kullanılmamış.' %></p>
+                <% } %>
+            </div>
         <% } %>
 
         <% if (!locals.isAdmin) { %>
@@ -103,7 +133,7 @@
         <div class="card">
             <h2>Gelen Son Mail (Referans)</h2>
             <% if (locals.email && !locals.email.error) { %>
-                <p><strong>Geliş Tarihi:</strong> <%= new Date(email.receivedDateTime).toLocaleString('tr-TR', { timeZone: 'Asia/Baku' }) %></p>
+                <p><strong>Geliş Tarihi:</strong> <%= new Date(email.receivedDateTime).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) %></p>
                 <p><strong>Konu:</strong> <%= email.subject %></p>
                 <p><strong>Gönderen:</strong> <%= email.from.emailAddress.name %> (<%= email.from.emailAddress.address %>)</p>
                 <hr>
@@ -115,24 +145,69 @@
             <% } %>
         </div>
     </div>
+    
+    <% if (locals.isAdmin) { %>
+    <script>
+        function showAlert(message, type = 'success', duration = 4000) {
+            const alertContainer = document.getElementById('alert-container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `card alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+            setTimeout(() => {
+                alertDiv.style.opacity = '0';
+                setTimeout(() => { if (alertContainer.contains(alertDiv)) { alertContainer.removeChild(alertDiv); } }, 500);
+            }, duration);
+        }
+
+        const createBtn = document.getElementById('create-and-copy-btn');
+        if (createBtn) {
+            createBtn.addEventListener('click', async () => {
+                createBtn.textContent = 'Oluşturuluyor...';
+                createBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/api/generate-key', { method: 'POST' });
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        await navigator.clipboard.writeText(data.newKey);
+                        showAlert(`Oluşturuldu ve kopyalandı: ${data.newKey}`);
+                    } else {
+                        showAlert(data.message || 'Bir hata oluştu.', 'danger');
+                    }
+                } catch (error) {
+                    console.error('API isteği başarısız:', error);
+                    showAlert('İstek gönderilirken bir hata oluştu.', 'danger');
+                } finally {
+                    createBtn.textContent = 'Yeni Anahtar Oluştur ve Kopyala';
+                    createBtn.disabled = false;
+                }
+            });
+        }
+    </script>
+    <% } %>
 
     <script>
         function copyToClipboard() {
             const content = document.getElementById('copy-content');
-            navigator.clipboard.writeText(content.value).then(() => {
-                const feedback = document.getElementById('copy-feedback');
-                feedback.textContent = 'Metin başarıyla kopyalandı!';
-                setTimeout(() => { feedback.textContent = ''; }, 2000);
-            }).catch(err => {
-                console.error('Kopyalama başarısız oldu: ', err);
-                const feedback = document.getElementById('copy-feedback');
-                feedback.textContent = 'Hata: Kopyalanamadı!';
-                feedback.style.color = 'red';
-                 setTimeout(() => {
-                    feedback.textContent = '';
-                    feedback.style.color = 'green';
-                }, 2000);
-            });
+            navigator.clipboard.writeText(content.value)
+                .then(() => {
+                    const feedback = document.getElementById('copy-feedback');
+                    feedback.textContent = 'Metin başarıyla kopyalandı!';
+                    setTimeout(() => { feedback.textContent = ''; }, 2000);
+                })
+                .catch(err => {
+                    console.error('Kopyalama başarısız oldu: ', err);
+                    const feedback = document.getElementById('copy-feedback');
+                    feedback.textContent = 'Hata: Kopyalanamadı!';
+                    feedback.style.color = 'red';
+                    setTimeout(() => {
+                        feedback.textContent = '';
+                        feedback.style.color = 'green';
+                    }, 2000);
+                });
         }
     </script>
 </body>
