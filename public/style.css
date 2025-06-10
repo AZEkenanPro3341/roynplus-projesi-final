@@ -316,6 +316,26 @@ footer {
     text-align: center;
 }
 
+.key-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px;
+}
+.btn-copy {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0 0 0 5px;
+    font-size: 1.2em;
+    line-height: 1;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+.btn-copy:hover {
+    opacity: 1;
+}
 
 /* Mobil Cihazlar için Ayarlar */
 @media (max-width: 768px) {

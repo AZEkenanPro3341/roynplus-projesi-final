@@ -93,7 +93,12 @@
                                         const dailyUsage = (k.last_login_date === today) ? k.login_count : 0;
                                     %>
                                     <tr>
-                                        <td data-label="Anahtar" title="<%= k.key %>"><%= k.key.substring(0, 13) %>...</td>
+                                        <td data-label="Anahtar" title="<%= k.key %>">
+                                            <div class="key-cell">
+                                                <span><%= k.key.substring(0, 13) %>...</span>
+                                                <button type="button" class="btn-copy" onclick="copyKey('<%= k.key %>')" title="Anahtarın tamamını kopyala">📋</button>
+                                            </div>
+                                        </td>
                                         <td data-label="Durum"><span class="status <%= status.class %>"><%= status.text %></span></td>
                                         <td data-label="Geçerlilik"><%= k.validity_days %> gün</td>
                                         <td data-label="Bitiş Tarihi"><%= expiryDateStr %></td>
@@ -197,6 +202,15 @@
                     createBtn.textContent = 'Oluştur ve Kopyala';
                     createBtn.disabled = false;
                 }
+            });
+        }
+        
+        function copyKey(keyText) {
+            navigator.clipboard.writeText(keyText).then(() => {
+                showAlert('Anahtar panoya kopyalandı!', 'success', 2000);
+            }).catch(err => {
+                console.error('Anahtar kopyalanamadı:', err);
+                showAlert('Hata: Anahtar kopyalanamadı!', 'danger', 3000);
             });
         }
     </script>
