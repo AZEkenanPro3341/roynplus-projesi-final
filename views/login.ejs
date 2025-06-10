@@ -11,7 +11,7 @@
         <div class="card">
             <h1>Lütfen Erişim Anahtarınızı Girin</h1>
             <form action="/login" method="post">
-                <input type="text" name="key" placeholder="Anahtarınızı buraya yapıştırın">
+                <input type="text" name="key" placeholder="Anahtarınızı buraya yapıştırın" required>
                 <button type="submit">Giriş Yap</button>
             </form>
             <% if (locals.error) { %>

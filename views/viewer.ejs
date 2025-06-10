@@ -40,7 +40,7 @@
             <div class="card">
                 <h2>Mail İçeriği</h2>
                 <textarea id="copy-content" readonly style="display:none;"><%= locals.settings.copy_text %></textarea>
-                <button onclick="copyToClipboard()">maili kopyala</button>
+                <button onclick="copyToClipboard()">Maili Kopyala</button>
                 <p id="copy-feedback" style="color:green;"></p>
             </div>
         <% } %>
@@ -50,7 +50,7 @@
             <% if (locals.email && !locals.email.error) { %>
                 <p><strong>Geliş Tarihi:</strong> <%= new Date(email.receivedDateTime).toLocaleString('tr-TR', { timeZone: 'Asia/Baku' }) %></p>
                 <p><strong>Konu:</strong> <%= email.subject %></p>
-                <p><strong>Gönderen:</strong> <%= email.from.emailAddress.name %></p>
+                <p><strong>Gönderen:</strong> <%= email.from.emailAddress.name %> (<%= email.from.emailAddress.address %>)</p>
                 <hr>
                 <div><%- email.body.content %></div>
             <% } else if (locals.email && locals.email.error) { %>
@@ -68,7 +68,16 @@
                 const feedback = document.getElementById('copy-feedback');
                 feedback.textContent = 'Metin başarıyla kopyalandı!';
                 setTimeout(() => { feedback.textContent = ''; }, 2000);
-            }).catch(err => { console.error('Kopyalama başarısız oldu: ', err); });
+            }).catch(err => {
+                console.error('Kopyalama başarısız oldu: ', err);
+                const feedback = document.getElementById('copy-feedback');
+                feedback.textContent = 'Hata: Kopyalanamadı!';
+                feedback.style.color = 'red';
+                 setTimeout(() => {
+                    feedback.textContent = '';
+                    feedback.style.color = 'green';
+                }, 2000);
+            });
         }
     </script>
 </body>

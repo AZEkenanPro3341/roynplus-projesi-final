@@ -10,7 +10,7 @@ body {
     color: #1c1e21;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start; /* Üstten başlaması için */
     min-height: 100vh;
 }
 
@@ -29,6 +29,7 @@ body {
     padding: 25px;
     margin-top: 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    word-wrap: break-word; /* Uzun metinlerin taşmasını engeller */
 }
 
 /* Form Elementleri */
@@ -40,6 +41,7 @@ form {
 label {
     font-weight: 600;
     margin-bottom: 5px;
+    margin-top: 10px;
     text-align: left;
 }
 
@@ -52,7 +54,7 @@ textarea {
     border: 1px solid #ccc;
     border-radius: 6px;
     margin-bottom: 15px;
-    font-family: monospace;
+    font-family: inherit; /* Sayfanın genel fontunu kullan */
 }
 
 textarea {
@@ -70,6 +72,7 @@ button {
     border-radius: 6px;
     cursor: pointer;
     transition: background-color 0.2s;
+    margin-top: 10px;
 }
 
 button:hover {
@@ -77,9 +80,13 @@ button:hover {
 }
 
 /* Başlıklar ve Linkler */
-h1, h2 {
+h1, h2, h4 {
     text-align: center;
     color: #0d1d35;
+}
+
+h4 {
+    margin-top: 0;
 }
 
 a {
@@ -95,12 +102,19 @@ a:hover {
     display: block;
     text-align: right;
     margin-bottom: 10px;
+    font-weight: bold;
 }
 
 hr {
     border: none;
     border-top: 1px solid #eee;
     margin: 25px 0;
+}
+
+footer {
+    text-align: center;
+    margin-top: 20px;
+    color: #6c757d;
 }
 
 /* Mobil Cihazlar için Ayarlar */

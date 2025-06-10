@@ -1,3 +1,4 @@
+// server.js (GÜNCELLENMİŞ HALİ)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -9,10 +10,11 @@ const app = express();
 
 const PORT = process.env.PORT || 8000;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'BDaP5924';
+const DAILY_LOGIN_LIMIT = 5; // Günlük giriş limiti
 
 const dbPath = path.join(process.env.RENDER_DISK_MOUNT_PATH || '.', 'keys.db');
 const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) { console.error("Veritabanı ana bağlantı hatası:", err.message); } 
+    if (err) { console.error("Veritabanı ana bağlantı hatası:", err.message); }
     else { console.log(`Veritabanı ana bağlantısı başarılı: ${dbPath}`); }
 });
 
@@ -34,9 +36,11 @@ async function getLatestEmail() { const accessToken = await getMsGraphToken(); i
 
 // --- Express Ayarları ---
 app.set('view engine', 'ejs');
-app.use(express.urlencoded({ extended: true }));
+// EJS dosyalarının "views" klasöründe olduğunu belirtin (standart kullanım)
+app.set('views', path.join(__dirname, 'views'));
 
-// YENİ EKLENEN SATIR: 'public' klasörünü dışarıya açar
+app.use(express.urlencoded({ extended: true }));
+// CSS/JS gibi statik dosyaların "public" klasöründe olduğunu belirtin
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -56,28 +60,64 @@ app.get('/', (req, res) => { res.render('login', { error: null }); });
 
 app.post('/login', (req, res) => {
     const userKey = req.body.key;
+
     if (userKey === ADMIN_KEY) {
         req.session.isLoggedIn = true;
         req.session.isAdmin = true;
         return res.redirect('/viewer');
     }
-    db.get("SELECT first_used_at FROM access_keys WHERE key = ?", [userKey], (err, row) => {
-        if (err) { return res.render('login', { error: 'Bir veritabanı hatası oluştu.' }); }
-        if (row) {
-            req.session.isAdmin = false;
-            if (row.first_used_at === null) {
-                const now = new Date().toISOString();
-                db.run("UPDATE access_keys SET first_used_at = ? WHERE key = ?", [now, userKey], (updateErr) => {
-                    if (updateErr) { return res.render('login', { error: 'Veritabanı güncellenirken bir hata oluştu.' }); }
-                    req.session.isLoggedIn = true; res.redirect('/viewer');
-                });
-            } else {
-                const firstUsedDate = new Date(row.first_used_at); const expiryDate = new Date(firstUsedDate);
-                expiryDate.setDate(firstUsedDate.getDate() + 30);
-                if (expiryDate > new Date()) { req.session.isLoggedIn = true; res.redirect('/viewer'); }
-                else { res.render('login', { error: 'Girdiğiniz anahtarın 1 aylık kullanım süresi dolmuş.' }); }
+
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD formatında bugünün tarihi
+
+    db.get("SELECT first_used_at, login_count, last_login_date FROM access_keys WHERE key = ?", [userKey], (err, row) => {
+        if (err) {
+            console.error("Login DB hatası:", err.message);
+            return res.render('login', { error: 'Bir veritabanı hatası oluştu.' });
+        }
+        if (!row) {
+            return res.render('login', { error: 'Geçersiz anahtar.' });
+        }
+
+        let currentLoginCount = row.login_count;
+
+        // Eğer son giriş tarihi bugünden farklıysa, sayacı sıfırla
+        if (row.last_login_date !== today) {
+            currentLoginCount = 0;
+        }
+
+        // Günlük giriş limitini kontrol et
+        if (currentLoginCount >= DAILY_LOGIN_LIMIT) {
+            return res.render('login', { error: `Bu anahtar için günlük ${DAILY_LOGIN_LIMIT} giriş hakkınız dolmuştur.` });
+        }
+
+        // 30 günlük anahtar süresini kontrol et
+        if (row.first_used_at !== null) {
+            const firstUsedDate = new Date(row.first_used_at);
+            const expiryDate = new Date(firstUsedDate);
+            expiryDate.setDate(firstUsedDate.getDate() + 30);
+            if (expiryDate < new Date()) {
+                return res.render('login', { error: 'Girdiğiniz anahtarın 30 günlük kullanım süresi dolmuş.' });
             }
-        } else { res.render('login', { error: 'Geçersiz anahtar.' }); }
+        }
+
+        // Giriş başarılı, şimdi veritabanını güncelle
+        const isFirstUse = row.first_used_at === null;
+        const now = isFirstUse ? new Date().toISOString() : row.first_used_at;
+        const newLoginCount = currentLoginCount + 1;
+
+        db.run(
+            "UPDATE access_keys SET first_used_at = ?, login_count = ?, last_login_date = ? WHERE key = ?",
+            [now, newLoginCount, today, userKey],
+            (updateErr) => {
+                if (updateErr) {
+                    console.error("Login update hatası:", updateErr.message);
+                    return res.render('login', { error: 'Veritabanı güncellenirken bir hata oluştu.' });
+                }
+                req.session.isLoggedIn = true;
+                req.session.isAdmin = false;
+                res.redirect('/viewer');
+            }
+        );
     });
 });
 
