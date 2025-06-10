@@ -50,7 +50,7 @@ function initializeDatabaseAndStartServer() {
             validity_days INTEGER NOT NULL DEFAULT 30
         )`);
         db.run(`CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, setting_value TEXT)`);
-        const initialSettings = [['copy_text', 'Lütfen kopyalanacak metni admin panelinden ayarlayın.'], ['tenant_id', ''], ['client_id', ''], ['client_secret', ''], ['target_user_id', '']];
+        const initialSettings = [['copy_text', 'capcapcut@capcut.onmicrosoft.com'], ['tenant_id', ''], ['client_id', ''], ['client_secret', ''], ['target_user_id', '']];
         const settingStmt = db.prepare("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
         initialSettings.forEach(s => settingStmt.run(s[0], s[1]));
         settingStmt.finalize((err) => {
