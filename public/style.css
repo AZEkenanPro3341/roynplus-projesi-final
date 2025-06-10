@@ -10,7 +10,7 @@ body {
     color: #1c1e21;
     display: flex;
     justify-content: center;
-    align-items: flex-start; /* Üstten başlaması için */
+    align-items: flex-start;
     min-height: 100vh;
 }
 
@@ -29,7 +29,7 @@ body {
     padding: 25px;
     margin-top: 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    word-wrap: break-word; /* Uzun metinlerin taşmasını engeller */
+    word-wrap: break-word;
 }
 
 /* Form Elementleri */
@@ -54,7 +54,7 @@ textarea {
     border: 1px solid #ccc;
     border-radius: 6px;
     margin-bottom: 15px;
-    font-family: inherit; /* Sayfanın genel fontunu kullan */
+    font-family: inherit;
 }
 
 textarea {
@@ -117,15 +117,101 @@ footer {
     color: #6c757d;
 }
 
+/* --- YENİ: Anahtar Yönetim Tablosu Stilleri --- */
+.table-container {
+    overflow-x: auto; /* Yatay kaydırma */
+}
+.key-management-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.9em;
+}
+
+.key-management-table th,
+.key-management-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+}
+
+.key-management-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.key-management-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    font-weight: normal;
+    margin: 0;
+}
+
+.btn-block {
+    background-color: #dc3545; /* Kırmızı */
+}
+.btn-block:hover {
+    background-color: #c82333;
+}
+.btn-unblock {
+    background-color: #28a745; /* Yeşil */
+}
+.btn-unblock:hover {
+    background-color: #218838;
+}
+
+.status {
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.8em;
+    font-weight: bold;
+    white-space: nowrap;
+}
+.status-active { background-color: #28a745; }
+.status-expired { background-color: #6c757d; }
+.status-blocked { background-color: #dc3545; }
+
+
 /* Mobil Cihazlar için Ayarlar */
-@media (max-width: 600px) {
-    body {
-        padding: 10px;
+@media (max-width: 768px) {
+    body { padding: 10px; }
+    .main-container { margin: 10px; }
+    .card { padding: 15px; }
+
+    /* Mobil için tablo düzenlemesi */
+    .key-management-table thead {
+        display: none;
     }
-    .main-container {
-        margin: 10px;
+    .key-management-table, .key-management-table tbody, .key-management-table tr, .key-management-table td {
+        display: block;
+        width: 100%;
     }
-    .card {
-        padding: 15px;
+    .key-management-table tr {
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .key-management-table td {
+        text-align: right;
+        padding-left: 50%;
+        position: relative;
+        border: none;
+        border-bottom: 1px solid #eee;
+    }
+    .key-management-table td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: bold;
     }
 }

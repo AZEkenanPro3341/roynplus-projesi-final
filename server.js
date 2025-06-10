@@ -1,4 +1,4 @@
-// server.js (GÜNCELLENMİŞ HALİ)
+// server.js (Anahtar listesi sadece kullanılanları gösterecek şekilde güncellendi)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -10,7 +10,7 @@ const app = express();
 
 const PORT = process.env.PORT || 8000;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'BDaP5924';
-const DAILY_LOGIN_LIMIT = 5; // Günlük giriş limiti
+const DAILY_LOGIN_LIMIT = 5;
 
 const dbPath = path.join(process.env.RENDER_DISK_MOUNT_PATH || '.', 'keys.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -34,15 +34,12 @@ let msGraphToken = { accessToken: null, expiresAt: 0 };
 async function getMsGraphToken() { if (msGraphToken.accessToken && Date.now() < msGraphToken.expiresAt) { return msGraphToken.accessToken; } if (!settings.tenant_id || !settings.client_id || !settings.client_secret) { console.log("Azure ayarları eksik, token alınamıyor."); return null; } const tokenUrl = `https://login.microsoftonline.com/${settings.tenant_id}/oauth2/v2.0/token`; const params = new URLSearchParams(); params.append('grant_type', 'client_credentials'); params.append('client_id', settings.client_id); params.append('client_secret', settings.client_secret); params.append('scope', 'https://graph.microsoft.com/.default'); try { const response = await axios.post(tokenUrl, params); msGraphToken.accessToken = response.data.access_token; msGraphToken.expiresAt = Date.now() + (response.data.expires_in - 300) * 1000; console.log("Yeni bir Microsoft Graph API token'ı alındı."); return msGraphToken.accessToken; } catch (error) { console.error("HATA: Microsoft'tan token alınamadı.", error.response?.data); return null; } }
 async function getLatestEmail() { const accessToken = await getMsGraphToken(); if (!accessToken) return { error: 'API token alınamadı. Lütfen admin panelinden Azure ayarlarını kontrol edin.' }; if (!settings.target_user_id) return { error: 'Hedef mail adresi admin panelinde ayarlanmamış.' }; const graphUrl = `https://graph.microsoft.com/v1.0/users/${settings.target_user_id}/messages?$filter=from/emailAddress/address eq 'no-reply@account.capcut.com'&$top=20&$select=subject,from,receivedDateTime,body`; try { const response = await axios.get(graphUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } }); const messages = response.data.value; if (messages && messages.length > 0) { messages.sort((a, b) => new Date(b.receivedDateTime) - new Date(a.receivedDateTime)); return messages[0]; } else { return null; } } catch (error) { const errorMessage = error.response?.data?.error?.message || error.message; return { error: `Mail çekilemedi: ${errorMessage}` }; } }
 
+
 // --- Express Ayarları ---
 app.set('view engine', 'ejs');
-// EJS dosyalarının "views" klasöründe olduğunu belirtin (standart kullanım)
 app.set('views', path.join(__dirname, 'views'));
-
 app.use(express.urlencoded({ extended: true }));
-// CSS/JS gibi statik dosyaların "public" klasöründe olduğunu belirtin
 app.use(express.static(path.join(__dirname, 'public')));
-
 app.use(session({
     store: new SQLiteStore({
         db: 'sessions.db',
@@ -67,9 +64,9 @@ app.post('/login', (req, res) => {
         return res.redirect('/viewer');
     }
 
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD formatında bugünün tarihi
+    const today = new Date().toISOString().split('T')[0];
 
-    db.get("SELECT first_used_at, login_count, last_login_date FROM access_keys WHERE key = ?", [userKey], (err, row) => {
+    db.get("SELECT first_used_at, login_count, last_login_date, is_blocked FROM access_keys WHERE key = ?", [userKey], (err, row) => {
         if (err) {
             console.error("Login DB hatası:", err.message);
             return res.render('login', { error: 'Bir veritabanı hatası oluştu.' });
@@ -77,20 +74,20 @@ app.post('/login', (req, res) => {
         if (!row) {
             return res.render('login', { error: 'Geçersiz anahtar.' });
         }
+        
+        if (row.is_blocked) {
+            return res.render('login', { error: 'Bu anahtar yönetici tarafından engellenmiştir.' });
+        }
 
         let currentLoginCount = row.login_count;
-
-        // Eğer son giriş tarihi bugünden farklıysa, sayacı sıfırla
         if (row.last_login_date !== today) {
             currentLoginCount = 0;
         }
 
-        // Günlük giriş limitini kontrol et
         if (currentLoginCount >= DAILY_LOGIN_LIMIT) {
             return res.render('login', { error: `Bu anahtar için günlük ${DAILY_LOGIN_LIMIT} giriş hakkınız dolmuştur.` });
         }
 
-        // 30 günlük anahtar süresini kontrol et
         if (row.first_used_at !== null) {
             const firstUsedDate = new Date(row.first_used_at);
             const expiryDate = new Date(firstUsedDate);
@@ -100,7 +97,6 @@ app.post('/login', (req, res) => {
             }
         }
 
-        // Giriş başarılı, şimdi veritabanını güncelle
         const isFirstUse = row.first_used_at === null;
         const now = isFirstUse ? new Date().toISOString() : row.first_used_at;
         const newLoginCount = currentLoginCount + 1;
@@ -122,9 +118,52 @@ app.post('/login', (req, res) => {
 });
 
 app.get('/viewer', async (req, res) => {
-    if (!req.session.isLoggedIn) { return res.redirect('/'); }
+    if (!req.session.isLoggedIn) {
+        return res.redirect('/');
+    }
+
     const latestEmail = await getLatestEmail();
-    res.render('viewer', { email: latestEmail, isAdmin: req.session.isAdmin, settings: settings });
+    let keys = [];
+
+    if (req.session.isAdmin) {
+        // GÜNCELLEME: Sorguya "WHERE first_used_at IS NOT NULL" eklendi.
+        const query = "SELECT key, first_used_at, login_count, last_login_date, is_blocked FROM access_keys WHERE first_used_at IS NOT NULL ORDER BY id DESC";
+        db.all(query, [], (err, rows) => {
+            if (err) {
+                console.error("Anahtarlar çekilemedi:", err.message);
+                return res.status(500).send("Anahtarlar çekilirken bir hata oluştu.");
+            }
+            res.render('viewer', {
+                email: latestEmail,
+                isAdmin: req.session.isAdmin,
+                settings: settings,
+                keys: rows
+            });
+        });
+    } else {
+        res.render('viewer', {
+            email: latestEmail,
+            isAdmin: req.session.isAdmin,
+            settings: settings,
+            keys: []
+        });
+    }
+});
+
+app.post('/toggle-block/:key', (req, res) => {
+    if (!req.session.isLoggedIn || !req.session.isAdmin) {
+        return res.status(403).send("Bu işlem için yetkiniz yok.");
+    }
+    const keyToToggle = req.params.key;
+    const query = "UPDATE access_keys SET is_blocked = NOT is_blocked WHERE key = ?";
+
+    db.run(query, [keyToToggle], (err) => {
+        if (err) {
+            console.error("Anahtar durumu güncellenirken hata:", err.message);
+            return res.status(500).send("İşlem sırasında bir hata oluştu.");
+        }
+        res.redirect('/viewer');
+    });
 });
 
 app.post('/update-copy-text', (req, res) => {
@@ -156,7 +195,7 @@ app.post('/update-azure-settings', (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// Sunucuyu başlatmadan önce ayarları yükle
+// Sunucu Başlatma
 loadSettings((err) => {
     if (err) {
         console.error("Sunucu başlatılamadı, ayarlar yüklenemedi.");

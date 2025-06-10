@@ -1,4 +1,4 @@
-// generate-keys.js (GÜNCELLENMİŞ HALİ)
+// generate-keys.js (is_blocked sütunu eklendi)
 require('dotenv').config();
 const sqlite3 = require('sqlite3').verbose();
 const crypto = require('crypto');
@@ -9,13 +9,14 @@ const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
     console.log("Tablolar oluşturuluyor...");
-    // YENİ SÜTUNLAR EKLENDİ: login_count ve last_login_date
+    // YENİ SÜTUN EKLENDİ: is_blocked
     db.run(`CREATE TABLE IF NOT EXISTS access_keys (
         id INTEGER PRIMARY KEY,
         key TEXT NOT NULL UNIQUE,
         first_used_at DATETIME DEFAULT NULL,
         login_count INTEGER DEFAULT 0,
-        last_login_date TEXT
+        last_login_date TEXT,
+        is_blocked INTEGER DEFAULT 0
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS settings (
