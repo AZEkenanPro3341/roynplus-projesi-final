@@ -26,7 +26,7 @@
                     <h4>Yeni Anahtar Oluştur</h4>
                     <div class="key-gen-form">
                         <input type="number" id="validity-days-input" placeholder="Süre (gün) (Varsayılan: 30)" min="1" class="key-gen-input">
-                        <button type="button" id="create-and-copy-btn">Oluştur</button>
+                        <button type="button" id="create-btn">Oluştur</button>
                     </div>
                     <div id="new-key-result" class="key-gen-form" style="display: none; margin-top: 15px;">
                         <input type="text" id="new-key-display" readonly>
@@ -100,7 +100,7 @@
                                         <td data-label="Anahtar" title="<%= k.key %>">
                                             <div class="key-cell">
                                                 <span><%= k.key.substring(0, 13) %>...</span>
-                                                <button type="button" class="btn-copy" onclick="copyKey('<%= k.key %>')" title="Anahtarın tamamını kopyala">📋</button>
+                                                <button type="button" class="btn-copy" onclick="robustCopyToClipboard('<%= k.key %>')">📋</button>
                                             </div>
                                         </td>
                                         <td data-label="Durum"><span class="status <%= status.class %>"><%= status.text %></span></td>
@@ -139,7 +139,7 @@
             <div class="card">
                 <h2>Mail İçeriği</h2>
                 <textarea id="copy-content" readonly style="display:none;"><%= locals.settings.copy_text %></textarea>
-                <button onclick="copyToClipboard()">Maili Kopyala</button>
+                <button type="button" onclick="copyToClipboard()">Maili Kopyala</button>
                 <p id="copy-feedback" style="color:green;"></p>
             </div>
         <% } %>
@@ -160,10 +160,10 @@
         </div>
     </div>
     
-    <% if (locals.isAdmin) { %>
     <script>
         function showAlert(message, type = 'success', duration = 4000) {
             const alertContainer = document.getElementById('alert-container');
+            if (!alertContainer) return;
             const alertDiv = document.createElement('div');
             alertDiv.className = `card alert alert-${type}`;
             alertDiv.textContent = message;
@@ -192,82 +192,80 @@
                 });
             }
         }
-
-        const createBtn = document.getElementById('create-and-copy-btn');
-        if (createBtn) {
-            const newKeyResultDiv = document.getElementById('new-key-result');
-            const newKeyDisplayInput = document.getElementById('new-key-display');
-            const newKeyCopyBtn = document.getElementById('new-key-copy-btn');
-
-            createBtn.addEventListener('click', async () => {
-                createBtn.textContent = 'Oluşturuluyor...';
-                createBtn.disabled = true;
-                const validityInput = document.getElementById('validity-days-input');
-                const validity = validityInput.value;
-                try {
-                    const response = await fetch('/api/generate-key', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ validity_days: validity })
-                    });
-                    const data = await response.json();
-                    if (response.ok && data.success) {
-                        newKeyDisplayInput.value = data.newKey;
-                        newKeyResultDiv.style.display = 'flex';
-                        showAlert('Yeni anahtar oluşturuldu. Aşağıdan kopyalayabilirsiniz.');
-                        validityInput.value = '';
-                    } else {
-                        showAlert(data.message || 'Bir hata oluştu.', 'danger');
-                    }
-                } catch (error) {
-                    console.error('API isteği başarısız:', error);
-                    showAlert('İstek gönderilirken bir hata oluştu.', 'danger');
-                } finally {
-                    createBtn.textContent = 'Oluştur';
-                    createBtn.disabled = false;
-                }
-            });
-            
-            newKeyCopyBtn.addEventListener('click', () => {
-                robustCopyToClipboard(newKeyDisplayInput.value).then(() => {
-                    showAlert('Anahtar panoya kopyalandı!', 'success', 2000);
-                }).catch(err => {
-                    showAlert('Hata: Kopyalanamadı!', 'danger', 3000);
-                });
-            });
-        }
         
-        function copyKey(keyText) {
-            robustCopyToClipboard(keyText).then(() => {
-                showAlert('Anahtar panoya kopyalandı!', 'success', 2000);
-            }).catch(err => {
-                console.error('Anahtar kopyalanamadı:', err);
-                showAlert('Hata: Anahtar kopyalanamadı!', 'danger', 3000);
-            });
-        }
-    </script>
-    <% } %>
-
-    <script>
         function copyToClipboard() {
             const content = document.getElementById('copy-content');
-            robustCopyToClipboard(content.value) // Normal kullanıcılar için de sağlam kopyalayıcıyı kullan
+            if (!content) return;
+            robustCopyToClipboard(content.value)
                 .then(() => {
                     const feedback = document.getElementById('copy-feedback');
-                    feedback.textContent = 'Metin başarıyla kopyalandı!';
-                    setTimeout(() => { feedback.textContent = ''; }, 2000);
+                    if(feedback) {
+                        feedback.textContent = 'Metin başarıyla kopyalandı!';
+                        setTimeout(() => { feedback.textContent = ''; }, 2000);
+                    }
                 })
                 .catch(err => {
                     console.error('Kopyalama başarısız oldu: ', err);
                     const feedback = document.getElementById('copy-feedback');
-                    feedback.textContent = 'Hata: Kopyalanamadı!';
-                    feedback.style.color = 'red';
-                    setTimeout(() => {
-                        feedback.textContent = '';
-                        feedback.style.color = 'green';
-                    }, 2000);
+                    if(feedback) {
+                        feedback.textContent = 'Hata: Kopyalanamadı!';
+                        feedback.style.color = 'red';
+                        setTimeout(() => {
+                            feedback.textContent = '';
+                            feedback.style.color = 'green';
+                        }, 2000);
+                    }
                 });
         }
+
+        // DOM yüklendiğinde çalışacak script'ler
+        document.addEventListener('DOMContentLoaded', () => {
+            <% if (locals.isAdmin) { %>
+                const createBtn = document.getElementById('create-btn');
+                const newKeyResultDiv = document.getElementById('new-key-result');
+                const newKeyDisplayInput = document.getElementById('new-key-display');
+                const newKeyCopyBtn = document.getElementById('new-key-copy-btn');
+
+                if (createBtn) {
+                    createBtn.addEventListener('click', async () => {
+                        createBtn.textContent = 'Oluşturuluyor...';
+                        createBtn.disabled = true;
+                        const validityInput = document.getElementById('validity-days-input');
+                        const validity = validityInput.value;
+                        try {
+                            const response = await fetch('/api/generate-key', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ validity_days: validity })
+                            });
+                            const data = await response.json();
+                            if (response.ok && data.success) {
+                                newKeyDisplayInput.value = data.newKey;
+                                newKeyResultDiv.style.display = 'flex';
+                                showAlert('Yeni anahtar oluşturuldu. Aşağıdan kopyalayabilirsiniz.');
+                                validityInput.value = '';
+                            } else {
+                                showAlert(data.message || 'Bir hata oluştu.', 'danger');
+                            }
+                        } catch (error) {
+                            console.error('API isteği başarısız:', error);
+                            showAlert('İstek gönderilirken bir hata oluştu.', 'danger');
+                        } finally {
+                            createBtn.textContent = 'Oluştur';
+                            createBtn.disabled = false;
+                        }
+                    });
+                    
+                    newKeyCopyBtn.addEventListener('click', () => {
+                        robustCopyToClipboard(newKeyDisplayInput.value).then(() => {
+                            showAlert('Anahtar panoya kopyalandı!', 'success', 2000);
+                        }).catch(err => {
+                            showAlert('Hata: Kopyalanamadı!', 'danger', 3000);
+                        });
+                    });
+                }
+            <% } %>
+        });
     </script>
 </body>
 </html>
