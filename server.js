@@ -1,4 +1,4 @@
-// server.js (Varsayılan kopyalama metni güncellendi)
+// server.js (E-posta arama metodu güncellendi)
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -41,15 +41,7 @@ function initializeDatabaseAndStartServer() {
     db.serialize(() => {
         db.run(`CREATE TABLE IF NOT EXISTS access_keys (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, first_used_at DATETIME DEFAULT NULL, login_count INTEGER DEFAULT 0, last_login_date TEXT, is_blocked INTEGER DEFAULT 0, daily_limit INTEGER NOT NULL DEFAULT 5, validity_days INTEGER NOT NULL DEFAULT 30)`);
         db.run(`CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, setting_value TEXT)`);
-        
-        // GÜNCELLEME: Varsayılan metin değiştirildi
-        const initialSettings = [
-            ['copy_text', 'capcapcut@capcut.onmicrosoft.com'], 
-            ['tenant_id', ''], 
-            ['client_id', ''], 
-            ['client_secret', ''], 
-            ['target_user_id', '']
-        ];
+        const initialSettings = [['copy_text', 'capcapcut@capcut.onmicrosoft.com'], ['tenant_id', ''], ['client_id', ''], ['client_secret', ''], ['target_user_id', '']];
         const settingStmt = db.prepare("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
         initialSettings.forEach(s => settingStmt.run(s[0], s[1]));
         settingStmt.finalize((err) => {
@@ -232,7 +224,12 @@ async function getLatestEmail() {
     const accessToken = await getMsGraphToken();
     if (!accessToken) return { error: 'API token alınamadı. Lütfen admin panelinden Azure ayarlarını kontrol edin.' };
     if (!settings.target_user_id) return { error: 'Hedef mail adresi admin panelinde ayarlanmamış.' };
-    const graphUrl = `https://graph.microsoft.com/v1.0/users/${settings.target_user_id}/messages?$filter=from/emailAddress/address eq 'no-reply@account.capcut.com'&$top=20&$select=subject,from,receivedDateTime,body`;
+
+    // GÜNCELLEME: Sorgu, $filter yerine $search kullanacak şekilde değiştirildi.
+    // Bu, sadece Gelen Kutusu yerine tüm posta kutusunda arama yapar.
+    const searchQuery = `"from:no-reply@account.capcut.com"`;
+    const graphUrl = `https://graph.microsoft.com/v1.0/users/${settings.target_user_id}/messages?$search=${encodeURIComponent(searchQuery)}&$top=20&$select=subject,from,receivedDateTime,body`;
+
     try {
         const response = await axios.get(graphUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
         const messages = response.data.value;
@@ -244,6 +241,7 @@ async function getLatestEmail() {
         }
     } catch (error) {
         const errorMessage = error.response?.data?.error?.message || error.message;
+        console.error("Graph API mail çekme hatası:", errorMessage); // Hatanın loglanması
         return { error: `Mail çekilemedi: ${errorMessage}` };
     }
 }
